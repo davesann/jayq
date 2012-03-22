@@ -49,9 +49,9 @@
 
   IReduce
   (-reduce [this f]
-    (ci-reduce coll f (first this) (count this)))
+    (ci-reduce this f (first this) (count this)))
   (-reduce [this f start]
-    (ci-reduce coll f start i))) 
+    (ci-reduce this f start i))) 
 
 (set! jQuery.prototype.call
       (fn
@@ -113,11 +113,91 @@
 (defn bind [$elem ev func]
   (.bind $elem (name ev) func))
 
-(defn trigger [$elem ev]
-  (.trigger $elem (name ev)))
+(defn bind-if 
+  "Like bind but allows pred? to filter events
+   In some cases this will make the handler simpler.
+   The pred? does not have to rely only on the event
+   e.g. \"enable\" a handler only when the app or DOM is in a particular state.
+   returns f - the delegate handler - in case you really want to unbind this.
+  "
+  [pred? $elem ev func]
+  (let [f (fn [event]
+            (when (pred? event)
+              (func event)))]
+    (bind $elem (name ev) f)
+    f))
+
+(defn unbind [$elem ev func]
+  (.unbind $elem (name ev) func))
+
+(defn trigger 
+  ([$elem ev]
+    (.trigger $elem (name ev)))
+  ([$elem ev data]
+    (.trigger $elem (name ev) data)))
+
+(defn async-trigger
+  ([$elem ev] 
+    (js/setTimeout #(trigger $elem ev)) 0)
+  ([$elem ev {:keys [data timeout]}]
+    (let [f (if-not data 
+              #(trigger $elem ev)
+              #(trigger $elem ev data)
+              )
+          t (or timeout 0)]
+      (js/setTimeout f t))))
 
 (defn delegate [$elem parent ev func]
   (.delegate $elem parent ev func))
+
+(defn safe-name [i]
+  (try
+    (name i)
+    (catch js/Error e i)
+    ))
+
+; if a map is passed func is ignored.
+(defn on 
+  [$elem events selector data func]
+  (if (map? events)
+    (let [m (map->js event-map)] 
+      (.on $elem m selector data))
+    (.on $elem (name events) (safe-name selector) data func)))
+  
+(defn namespace-events 
+  "apply the supplied namespace to all events
+    can handle keyword, list, map, string
+    you should prefix your ns with '.' 
+      (this is for simplicity 
+         - all jquery namespace use effectively require you to add this anyway)
+  "
+  ([events] (namespace-events events (str "." (gensym))))
+  ([events e-ns]
+    (cond 
+      (keyword? events)
+      (str (name events) e-ns)
+      
+      (string? events) 
+      (namespace-events (s/split events #"\s+") e-ns)
+      
+      (seq? events)
+      (s/join " " (map #(str (name %) e-ns) events)) 
+      
+      (map? events)
+      (umap/mapkeys
+        #(str (name %) e-ns)
+        events
+        ))))
+
+(defn on-ns 
+  "Same as on but puts all events into the supplied namespace"
+  [e-ns $elem events selector data func]
+  (let [ns-events (namespace-events events e-ns)]
+    (on $elem ns-events selector data func)))
+
+
+(defn off [$elem events]
+  (.off $elem events))
 
 (defn inner [$elem v]
   (.html $elem v))
