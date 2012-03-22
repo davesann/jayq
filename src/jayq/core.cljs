@@ -1,7 +1,7 @@
 (ns jayq.core
   (:refer-clojure :exclude [val empty remove find])
   (:require [clojure.string :as string])
-  (:use [jayq.util :only [clj->js]]))
+  (:use [jayq.util :only [clj->js mapkeys]]))
 
 (defn crate-meta [func]
   (.-prototype._crateGroup func))
@@ -125,6 +125,42 @@
 (defn slide-down [$elem & [speed on-finish]]
   (.slideDown $elem speed on-finish))
 
+(defn parent [$elem]
+  (.parent $elem))
+
+(defn find [$elem selector]
+  (.find $elem (name selector)))
+
+(defn inner [$elem v]
+  (.html $elem v))
+
+(defn empty [$elem]
+  (.empty $elem))
+
+(defn val [$elem & [v]]
+  (if v
+    (.val $elem v)
+    (. $elem (val))))
+
+(defn queue [$elem callback]
+  (. $elem (queue callback)))
+
+(defn dequeue [elem]
+  (. ($ elem) (dequeue)))
+
+(defn document-ready [func]
+  (.ready ($ js/document) func))
+
+(defn xhr [[method uri] content callback]
+  (let [params (clj->js {:type (string/upper-case (name method))
+                         :data (clj->js content)
+                         :success callback})]
+    (.ajax js/jQuery uri params)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Events
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn bind [$elem ev func]
   (.bind $elem (name ev) func))
 
@@ -162,93 +198,6 @@
           t (or timeout 0)]
       (js/setTimeout f t))))
 
-(defn parent [$elem]
-  (.parent $elem))
-
-(defn find [$elem selector]
-  (.find $elem (name selector)))
-
-(defn safe-name [i]
-  (try
-    (name i)
-    (catch js/Error e i)
-    ))
-
-; if a map is passed func is ignored.
-(defn on 
-  [$elem events selector data func]
-  (if (map? events)
-    (let [m (map->js event-map)] 
-      (.on $elem m selector data))
-    (.on $elem (name events) (safe-name selector) data func)))
-  
-(defn namespace-events 
-  "apply the supplied namespace to all events
-    can handle keyword, list, map, string
-    you should prefix your ns with '.' 
-      (this is for simplicity 
-         - all jquery namespace use effectively require you to add this anyway)
-  "
-  ([events] (namespace-events events (str "." (gensym))))
-  ([events e-ns]
-    (cond 
-      (keyword? events)
-      (str (name events) e-ns)
-      
-      (string? events) 
-      (namespace-events (s/split events #"\s+") e-ns)
-      
-      (seq? events)
-      (s/join " " (map #(str (name %) e-ns) events)) 
-      
-      (map? events)
-      (umap/mapkeys
-        #(str (name %) e-ns)
-        events
-        ))))
-
-(defn on-ns 
-  "Same as on but puts all events into the supplied namespace"
-  [e-ns $elem events selector data func]
-  (let [ns-events (namespace-events events e-ns)]
-    (on $elem ns-events selector data func)))
-
-
-(defn off [$elem events]
-  (.off $elem events))
-
-(defn inner [$elem v]
-  (.html $elem v))
-
-(defn empty [$elem]
-  (.empty $elem))
-
-(defn val [$elem & [v]]
-  (if v
-    (.val $elem v)
-    (. $elem (val))))
-
-(defn queue [$elem callback]
-  (. $elem (queue callback)))
-
-(defn dequeue [elem]
-  (. ($ elem) (dequeue)))
-
-(defn document-ready [func]
-  (.ready ($ js/document) func))
-
-(defn xhr [[method uri] content callback]
-  (let [params (clj->js {:type (string/upper-case (name method))
-                         :data (clj->js content)
-                         :success callback})]
-    (.ajax js/jQuery uri params)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Events
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn bind [$elem ev func]
-  (.bind $elem (name ev) func))
 
 (defn trigger [$elem ev]
   (.trigger $elem (name ev)))
@@ -259,8 +208,10 @@
 (defn ->event [e]
   (cond
     (keyword? e) (name e)
+    (string? e) e
     (map? e) (clj->js e)
     (coll? e) (string/join " " (map name e))
+    
     :else (throw (js/Error. (str "Unknown event type: " e)))))
 
 (defn on [$elem events & [sel data handler]]
@@ -282,4 +233,35 @@
         (->event events)
         (->selector sel)
         handler))
+
+(defn namespace-events 
+  "apply the supplied namespace to all events
+    can handle keyword, list, map, string
+    you should prefix your ns with '.' 
+      (this is for simplicity 
+         - all jquery namespace use effectively require you to add this anyway)
+  "
+  ([events] (namespace-events events (str "." (gensym))))
+  ([events e-ns]
+    (cond 
+      (keyword? events)
+      (str (name events) e-ns)
+      
+      (string? events) 
+      (namespace-events (s/split events #"\s+") e-ns)
+      
+      (seq? events)
+      (s/join " " (map #(str (name %) e-ns) events)) 
+      
+      (map? events)
+      (mapkeys
+        #(str (name %) e-ns)
+        events
+        ))))
+
+(defn on-ns 
+  "Same as on but puts all events into the supplied namespace"
+  [e-ns $elem events selector data func]
+  (let [ns-events (namespace-events events e-ns)]
+    (on $elem ns-events selector data func)))
 

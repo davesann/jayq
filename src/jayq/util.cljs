@@ -29,3 +29,10 @@
     :else x))
   
 
+(defn mapkeys [f a-map]
+  "apply f to the keys in the supplied map
+   to produce a map {(f k1) v1 (f k2) v2 ...etc}"
+  (into {} 
+        (map (fn [[k v]] [(f k) v])
+         a-map)))
+
