@@ -87,6 +87,9 @@
       (. $elem (data k))
       (. $elem (data k v)))))
 
+(defn position [$elem]
+  (js->clj (.position $elem) :keywordize-keys true))
+
 (defn add-class [$elem cl]
   (let [cl (name cl)]
     (.addClass $elem cl)))
@@ -137,6 +140,9 @@
 (defn find [$elem selector]
   (.find $elem (name selector)))
 
+(defn clone [$elem]
+  (.clone $elem))
+
 (defn inner [$elem v]
   (.html $elem v))
 
@@ -169,20 +175,6 @@
 
 (defn bind [$elem ev func]
   (.bind $elem (name ev) func))
-
-(defn bind-if 
-  "Like bind but allows pred? to filter events
-   In some cases this will make the handler simpler.
-   The pred? does not have to rely only on the event
-   e.g. \"enable\" a handler only when the app or DOM is in a particular state.
-   returns f - the delegate handler - in case you really want to unbind this.
-  "
-  [pred? $elem ev func]
-  (let [f (fn [event]
-            (when (pred? event)
-              (func event)))]
-    (bind $elem (name ev) f)
-    f))
 
 (defn unbind [$elem ev func]
   (.unbind $elem (name ev) func))
@@ -240,34 +232,70 @@
         (->selector sel)
         handler))
 
+(defn prevent [e]
+  (.preventDefault e))
+
+(defn namespace-events- 
+  "expected e-ns to be str of form \".namespace\""
+  [events e-ns]
+  (cond 
+    (keyword? events)
+    (str (name events) e-ns)
+    
+    (string? events) 
+    (namespace-events (s/split events #"\s+") e-ns)
+    
+    (seq? events)
+    (s/join " " (map #(str (name %) e-ns) events)) 
+    
+    (map? events)
+    (mapkeys
+      #(str (name %) e-ns)
+      events
+      )))
+
 (defn namespace-events 
   "apply the supplied namespace to all events
-    can handle keyword, list, map, string
-    you should prefix your ns with '.' 
-      (this is for simplicity 
-         - all jquery namespace use effectively require you to add this anyway)
+    can handle events defined as keyword, list, map, string
   "
-  ([events] (namespace-events events (str "." (gensym))))
+  ([events] (namespace-events events (gensym)))
   ([events e-ns]
-    (cond 
-      (keyword? events)
-      (str (name events) e-ns)
-      
-      (string? events) 
-      (namespace-events (s/split events #"\s+") e-ns)
-      
-      (seq? events)
-      (s/join " " (map #(str (name %) e-ns) events)) 
-      
-      (map? events)
-      (mapkeys
-        #(str (name %) e-ns)
-        events
-        ))))
+    (let [e-ns-prefixed (str "." (name e-ns))]
+      (namespace-events- events e-ns-prefixed)
+      )))
 
 (defn on-ns 
   "Same as on but puts all events into the supplied namespace"
-  [e-ns $elem events selector data func]
+  [e-ns $elem events & [sel data handler]]
   (let [ns-events (namespace-events events e-ns)]
-    (on $elem ns-events selector data func)))
+    (on $elem ns-events sel data handler)))
+
+
+;; not sure if these are useful or not
+(defn bind-if 
+  "Like bind but allows pred? to filter events
+   In some cases this will make the handler simpler.
+   The pred? does not have to rely only on the event. 
+     DOM state or atoms captured in the scope can also be used
+   e.g. \"enable\" a handler only when the app or DOM is in a particular state.
+   returns f - the delegate handler - in case you really want to unbind this.
+  "
+  [pred? $elem ev func]
+  (let [f (fn [event] (when (pred? event) (func event)))]
+    (bind $elem (name ev) f)
+    f))
+
+(defn on-if 
+  "Like on but allows pred? to filter events
+   In some cases this will make the handler simpler.
+   The pred? does not have to rely only on the event. 
+     DOM state or atoms captured in the scope can also be used
+   e.g. \"enable\" a handler only when the app or DOM is in a particular state.
+   returns f - the delegate handler - in case you really want to unbind this.
+  "
+  [pred? $elem events & [sel data handler]]
+  (let [f (fn [event] (when (pred? event) (func event)))]
+    (on $elem events sel data f)
+    f))
+
 
