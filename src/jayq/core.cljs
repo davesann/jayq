@@ -113,11 +113,17 @@
 (defn toggle [$elem & [speed on-finish]]
   (.toggle $elem speed on-finish))
 
+(defn fade-toggle [$elem & [dur on-finish]]
+  (.fadeToggle $elem dur on-finish))
+
 (defn fade-out [$elem & [speed on-finish]]
   (.fadeOut $elem speed on-finish))
 
 (defn fade-in [$elem & [speed on-finish]]
   (.fadeIn $elem speed on-finish))
+
+(defn slide-toggle [$elem & [dur on-finish]]
+  (.slideToggle $elem dur on-finish))
 
 (defn slide-up [$elem & [speed on-finish]]
   (.slideUp $elem speed on-finish))
