@@ -1,6 +1,11 @@
 (ns jayq.core
   (:refer-clojure :exclude [val empty remove find])
-  (:require [clojure.string :as string])
+  (:require 
+    ;[dsann.utils.x.core :as u]
+
+    [clojure.string :as string]
+    [cljs.reader :as reader]
+    )
   (:use [jayq.util :only [clj->js mapkeys]]))
 
 (defn crate-meta [func]
@@ -86,6 +91,12 @@
     (if-not v
       (. $elem (data k))
       (. $elem (data k v)))))
+
+(defn cljs-data [$elem k & [v]]
+  (let [k (str "data-" (name k))]
+    (if-not v
+      (reader/read-string (. $elem (attr k)))
+      (. $elem (attr k v)))))
 
 (defn position [$elem]
   (js->clj (.position $elem) :keywordize-keys true))
@@ -270,6 +281,8 @@
   (let [ns-events (namespace-events events e-ns)]
     (on $elem ns-events sel data handler)))
 
+(defn off-ns 
+  [$elem e-ns] (off $elem (str "." (name e-ns))))
 
 ;; not sure if these are useful or not
 (defn bind-if 
