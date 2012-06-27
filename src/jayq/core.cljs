@@ -247,7 +247,7 @@
   (.preventDefault e))
 
 (defn namespace-events- 
-  "expected e-ns to be str of form \".namespace\""
+  "expects e-ns to be str of form \".namespace\""
   [events e-ns]
   (cond 
     (keyword? events)
